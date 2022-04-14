@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.DirectoryServices.AccountManagement;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,7 +10,32 @@ namespace GetLocalAdmins
 {
     class Program
     {
-        static string formatString = "|{0,18} |{1,18} |{2,18} |{3,18} |{4,46} | {5}  ";
+         // ToDo: Note if an account is disabled
+         // ToDo: max screen
+         // ToDo: Listed the different domains the users are from (can you have a user in a group that's not a trusted domain? is trust only validated when it's inserted?)
+        
+        static string formatString = "|{0,25} |{1,18} |{2,18} |{3,18} |{4,48} | {5}  ";
+        static string logPath = @"Output.log";
+        static void Log(string message)
+        {
+            Console.WriteLine(message);
+            if (!File.Exists(logPath))
+            {
+                // Create a file to write to.
+                using (StreamWriter sw = File.CreateText(logPath))
+                {
+                    sw.WriteLine(message);
+                }
+            }
+
+            // This text is always added, making the file longer over time
+            // if it is not deleted.
+            using (StreamWriter sw = File.AppendText(logPath))
+            {
+                sw.WriteLine(message);
+            }
+
+        }
         internal static void GetMembers(string sid, string highlightSid = "", string remoteMachine ="")
         {
             // https://docs.microsoft.com/en-us/windows/win32/ad/naming-properties
@@ -25,8 +51,8 @@ namespace GetLocalAdmins
 
             string message = String.Format(formatString, "UserPrincipalName", "SamAccountName", "DisplayName",  "Name", "SID", "DistinguishedName" );
             int tableHeaderWidth = message.Length;
-            Console.WriteLine(new string( '_',tableHeaderWidth));
-            Console.WriteLine(message);
+            Log(new string( '_',tableHeaderWidth));
+            Log(message);
 
             try
             {
@@ -41,7 +67,7 @@ namespace GetLocalAdmins
                     if(ctx == null)
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Failed to access: " + remoteMachine);
+                        Log("Failed to access: " + remoteMachine);
                         Console.ForegroundColor = ConsoleColor.Gray;
                         return;
                     }
@@ -58,8 +84,9 @@ namespace GetLocalAdmins
                         Console.ForegroundColor = ConsoleColor.Green;
                         message = message.Replace("|", "*");
                     }
+                    
                         
-                    Console.WriteLine(message);
+                    Log(message);
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }
 
@@ -71,13 +98,13 @@ namespace GetLocalAdmins
             catch (NullReferenceException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Failed to get group: " + sid);
+                Log("Failed to find group: " + sid);
                 Console.ForegroundColor = ConsoleColor.Gray;
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Failed to get group members: " + ex.Message);
+                Log("Failed to get group members: " + ex.Message);
                 Console.ForegroundColor = ConsoleColor.Gray;
             }
         }
@@ -126,30 +153,39 @@ namespace GetLocalAdmins
             // Print Current user info
             Console.WriteLine("Current User: " + upn);
             if (email != null && email.Trim() != "")
-                Console.WriteLine("\tEmail: " + email);
+                Log("\tEmail: " + email);
             if(employeeId != null && employeeId.Trim() != "")
-                Console.WriteLine("\tEmployee ID: " + employeeId);
+                Log("\tEmployee ID: " + employeeId);
             if(givenName != null && givenName.Trim() != "")
-                Console.WriteLine("\tGiven Name: " + givenName);
+                Log("\tGiven Name: " + givenName);
 
             string message = String.Format(formatString, "UserPrincipalName", "SamAccountName", "DisplayName", "Name", "SID", "DistinguishedName");
             int tableHeaderWidth = message.Length;
-            Console.WriteLine(new string('_', tableHeaderWidth));
-            Console.WriteLine(message);
+            Log(new string('_', tableHeaderWidth));
+            Log(message);
 
-            Console.WriteLine(formatString,upn,sam,displayName,name,sid,distinguished);
-            Console.WriteLine();
 
-            foreach(string host in remoteHostList)
+            message = String.Format(formatString,upn,sam,displayName,name,sid,distinguished);
+            Log(message);
+            Log("");
+
+            if (remoteHostList.Count == 0)
+                remoteHostList.Add("");
+            foreach (string host in remoteHostList)
             {
+                if (host.Trim() != "")
+                    Log("Querying against remote host on: " + host);
 
                 // This resursively prints the group membership of:
                 // Admins
                 // Look into:
                 // What's S-1-5-114?
-                Console.WriteLine("Admins");
+                if (host.Trim() != "")
+                    Log("Administrators");
+                else
+                    Log("Administrators on :" + host);
                 GetMembers("S-1-5-32-544", sid,host);
-                Console.WriteLine();
+                Log("");
 
                 // RDP
                 // Look into:
@@ -158,18 +194,26 @@ namespace GetLocalAdmins
                 // S-1-5-14	Remote Interactive Logon
                 // S-1-5-32-555	Builtin\Remote Desktop Users
                 // S-1-5-32-577	Builtin\RDS Management Servers
-                Console.WriteLine("RDP");
+
+                if (host.Trim() != "")
+                    Log("Remote Desktop Users");
+                else
+                    Log("Remote Desktop Users on: " + host);
+                
                 GetMembers("S-1-5-32-555", sid, host);
-                Console.WriteLine();
+                Log("");
 
 
 
                 // Remote Management Users group
                 // Look into:
                 // S-1-5-32-580	Builtin\Remote Management Users
-                Console.WriteLine("WinRM");
+                if (host.Trim() != "")
+                    Log("WinRM (Not including those in the Administrators group)");
+                else
+                    Log("Remote Management Users on: " + host);
                 GetMembers("S-1-5-32-580", sid, host);
-                Console.WriteLine();
+                Log("");
 
 
                 // Others that look interesting
