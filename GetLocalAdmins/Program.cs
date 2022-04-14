@@ -151,7 +151,7 @@ namespace GetLocalAdmins
             //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.SmartcardLogonRequired;
 
             // Print Current user info
-            Console.WriteLine("Current User: " + upn);
+            Log("Current User: " + upn);
             if (email != null && email.Trim() != "")
                 Log("\tEmail: " + email);
             if(employeeId != null && employeeId.Trim() != "")
@@ -161,7 +161,7 @@ namespace GetLocalAdmins
 
             string message = String.Format(formatString, "UserPrincipalName", "SamAccountName", "DisplayName", "Name", "SID", "DistinguishedName");
             int tableHeaderWidth = message.Length;
-            Log(new string('_', tableHeaderWidth));
+            Log(new string('=', tableHeaderWidth));
             Log(message);
 
 
@@ -180,7 +180,7 @@ namespace GetLocalAdmins
                 // Admins
                 // Look into:
                 // What's S-1-5-114?
-                if (host.Trim() != "")
+                if (host.Trim() == "")
                     Log("Administrators");
                 else
                     Log("Administrators on :" + host);
@@ -195,7 +195,7 @@ namespace GetLocalAdmins
                 // S-1-5-32-555	Builtin\Remote Desktop Users
                 // S-1-5-32-577	Builtin\RDS Management Servers
 
-                if (host.Trim() != "")
+                if (host.Trim() == "")
                     Log("Remote Desktop Users");
                 else
                     Log("Remote Desktop Users on: " + host);
@@ -208,7 +208,7 @@ namespace GetLocalAdmins
                 // Remote Management Users group
                 // Look into:
                 // S-1-5-32-580	Builtin\Remote Management Users
-                if (host.Trim() != "")
+                if (host.Trim() == "")
                     Log("WinRM (Not including those in the Administrators group)");
                 else
                     Log("Remote Management Users on: " + host);
@@ -231,7 +231,7 @@ namespace GetLocalAdmins
 
         private static void printBanner()
         {
-            Console.WriteLine("Only supported arguments are -h/--help and hostnames as parameters");
+            Console.WriteLine("Only supported arguments are -h/--help and (remote) hostnames as parameters (which not working right now)");
         }
     }
 }
