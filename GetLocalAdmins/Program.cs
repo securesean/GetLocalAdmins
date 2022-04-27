@@ -79,35 +79,45 @@ namespace GetLocalAdmins
                 try
                 {
                     adminMembers = adminGroup.GetMembers(true);
-                }catch (System.DirectoryServices.AccountManagement.PrincipalServerDownException ex)
+                }catch (System.NullReferenceException ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Log("Failed to get group membership (The group might not exist): " + ex);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
+                catch (System.DirectoryServices.AccountManagement.PrincipalServerDownException ex)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Log("Not Gathering Recursively. LDAP Server not accessiable (likely off-network): " + ex);
                     Console.ForegroundColor = ConsoleColor.Gray;
-
+                    
                     adminMembers = adminGroup.GetMembers();
                 }
 
 
                 
                 // print table
-                foreach (Principal principal in adminMembers)
+                if(adminMembers != null)
                 {
-                    message = String.Format(formatString, principal.UserPrincipalName, principal.SamAccountName,  principal.DisplayName,  principal.Name, principal.Sid, principal.DistinguishedName);
-                    if (principal.Sid.ToString() == highlightSid)
+                    foreach (Principal principal in adminMembers)
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        message = message.Replace("|", "*");
+                        message = String.Format(formatString, principal.UserPrincipalName, principal.SamAccountName, principal.DisplayName, principal.Name, principal.Sid, principal.DistinguishedName);
+                        if (principal.Sid.ToString() == highlightSid)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            message = message.Replace("|", "*");
+                        }
+
+
+                        Log(message);
+                        Console.ForegroundColor = ConsoleColor.Gray;
                     }
-                    
-                        
-                    Log(message);
-                    Console.ForegroundColor = ConsoleColor.Gray;
+
+
+                    adminMembers.Dispose();
+                    ctx.Dispose();
                 }
-
-
-                adminMembers.Dispose();
-                ctx.Dispose();
+                
 
             }
             catch (NullReferenceException ex)
@@ -143,27 +153,62 @@ namespace GetLocalAdmins
             }
 
 
+            string upn = null;
+            string sam = null;
+            string displayName = null;
+            string name = null;
+            string sid = null;
+            string distinguished = null;
+
+            string givenName = null;
+            string email = null;
+            string employeeId = null;
+
             // This users information:
-            // "UserPrincipalName", "SamAccountName", "DisplayName",  "Name", "SID", "DistinguishedName" );
-            string upn = System.DirectoryServices.AccountManagement.UserPrincipal.Current.UserPrincipalName;
-            string sam = System.DirectoryServices.AccountManagement.UserPrincipal.Current.SamAccountName;
-            string displayName = System.DirectoryServices.AccountManagement.UserPrincipal.Current.DisplayName;
-            string name = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Name;
-            string sid = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Sid.ToString();
-            string distinguished = System.DirectoryServices.AccountManagement.UserPrincipal.Current.DistinguishedName;
+            try
+            {
+                // "UserPrincipalName", "SamAccountName", "DisplayName",  "Name", "SID", "DistinguishedName" );
+                upn = System.DirectoryServices.AccountManagement.UserPrincipal.Current.UserPrincipalName;
+                sam = System.DirectoryServices.AccountManagement.UserPrincipal.Current.SamAccountName;
+                displayName = System.DirectoryServices.AccountManagement.UserPrincipal.Current.DisplayName;
+                name = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Name;
+                sid = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Sid.ToString();
+                distinguished = System.DirectoryServices.AccountManagement.UserPrincipal.Current.DistinguishedName;
 
-            // Extra
-            string givenName = System.DirectoryServices.AccountManagement.UserPrincipal.Current.GivenName;
-            string email = System.DirectoryServices.AccountManagement.UserPrincipal.Current.EmailAddress;
-            string employeeId = System.DirectoryServices.AccountManagement.UserPrincipal.Current.EmployeeId;
+                // Extra
+                givenName = System.DirectoryServices.AccountManagement.UserPrincipal.Current.GivenName;
+                email = System.DirectoryServices.AccountManagement.UserPrincipal.Current.EmailAddress;
+                employeeId = System.DirectoryServices.AccountManagement.UserPrincipal.Current.EmployeeId;
 
-            // Interesting - look at later
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Certificates;
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Enabled;
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PasswordNeverExpires;
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PasswordNotRequired;
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PermittedWorkstations;
-            //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.SmartcardLogonRequired;
+                // Interesting - look at later
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Certificates;
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.Enabled;
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PasswordNeverExpires;
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PasswordNotRequired;
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.PermittedWorkstations;
+                //string something = System.DirectoryServices.AccountManagement.UserPrincipal.Current.SmartcardLogonRequired;
+            }
+            catch (System.DirectoryServices.AccountManagement.PrincipalServerDownException ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Log("Not gathering info via LDAP because server not accessiable (likely off-network): " + ex);
+                Console.ForegroundColor = ConsoleColor.Gray;
+
+                // TODO: Get this user's information another way
+                string userName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                PrincipalContext ctx = new PrincipalContext(ContextType.Machine);
+                UserPrincipal user = UserPrincipal.FindByIdentity(ctx, IdentityType.SamAccountName, userName);
+                email = user.EmailAddress;
+                employeeId = user.EmployeeId;
+                givenName = user.GivenName;
+                upn = user.UserPrincipalName;
+                sam = user.SamAccountName;
+                displayName = user.DisplayName;
+                name = user.Name;
+                sid = user.Sid.ToString();
+                distinguished = user.DistinguishedName;
+            }
+            
 
             // Print Current user info
             Log("Current User: " + upn);
