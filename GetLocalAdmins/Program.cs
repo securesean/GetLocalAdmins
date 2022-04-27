@@ -191,22 +191,53 @@ namespace GetLocalAdmins
             catch (System.DirectoryServices.AccountManagement.PrincipalServerDownException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Log("Not gathering info via LDAP because server not accessiable (likely off-network): " + ex);
+                Log("Not gathering info via LDAP because server not accessiable (likely this machine is off-network) ");
                 Console.ForegroundColor = ConsoleColor.Gray;
 
                 // TODO: Get this user's information another way
-                string userName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
-                PrincipalContext ctx = new PrincipalContext(ContextType.Machine);
+                var userWinIden = System.Security.Principal.WindowsIdentity.GetCurrent();
+                string userName = userWinIden.Name;
+                Log("Attempting to get info for: " + userName);
+
+                string userSid = UserPrincipal.Current.Sid.ToString();
+                Log("Attempting to get info for: " + userSid);
+
+
+                PrincipalContext ctx = new PrincipalContext(ContextType.Domain);
                 UserPrincipal user = UserPrincipal.FindByIdentity(ctx, IdentityType.SamAccountName, userName);
-                email = user.EmailAddress;
-                employeeId = user.EmployeeId;
-                givenName = user.GivenName;
-                upn = user.UserPrincipalName;
-                sam = user.SamAccountName;
-                displayName = user.DisplayName;
-                name = user.Name;
-                sid = user.Sid.ToString();
-                distinguished = user.DistinguishedName;
+                if(user == null)
+                {
+                    user = UserPrincipal.FindByIdentity(ctx, IdentityType.Sid, userSid);
+                }
+
+                if (user == null)
+                {
+                    ctx = new PrincipalContext(ContextType.Machine);
+                    user = UserPrincipal.FindByIdentity(ctx, IdentityType.Sid, userSid);
+                }
+
+                if (user == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Log("Failed to get local user account data");
+                    Console.ForegroundColor = ConsoleColor.Gray;
+
+                    name = userName;
+                    sid = userSid;
+                }
+                else
+                {
+                    email = user.EmailAddress;
+                    employeeId = user.EmployeeId;
+                    givenName = user.GivenName;
+                    upn = user.UserPrincipalName;
+                    sam = user.SamAccountName;
+                    displayName = user.DisplayName;
+                    name = user.Name;
+                    sid = user.Sid.ToString();
+                    distinguished = user.DistinguishedName;
+                }
+
             }
             
 
