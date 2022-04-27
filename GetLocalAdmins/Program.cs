@@ -62,7 +62,8 @@ namespace GetLocalAdmins
                     ctx = new PrincipalContext(ContextType.Machine);
                 } else
                 {
-                    // Not tested
+                    // Not working
+                    // https://stackoverflow.com/questions/12608971/net-4-5-bug-in-userprincipal-findbyidentity-system-directoryservices-accountma
                     ctx = new PrincipalContext(ContextType.Domain, remoteMachine);  
                     if(ctx == null)
                     {
@@ -73,7 +74,21 @@ namespace GetLocalAdmins
                     }
                 }
                 GroupPrincipal adminGroup = GroupPrincipal.FindByIdentity(ctx, IdentityType.Sid, sid);
-                var adminMembers = adminGroup.GetMembers(true);
+
+                PrincipalSearchResult<Principal> adminMembers = null;
+                try
+                {
+                    adminMembers = adminGroup.GetMembers(true);
+                }catch (System.DirectoryServices.AccountManagement.PrincipalServerDownException ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Log("Not Gathering Recursively. LDAP Server not accessiable (likely off-network): " + ex);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+
+                    adminMembers = adminGroup.GetMembers();
+                }
+
+
                 
                 // print table
                 foreach (Principal principal in adminMembers)
